@@ -5,28 +5,42 @@
 % then manually run the last section of the script to actually start the
 % pipeline (after inspecting the automatically generated lists)
 
-addpath('C:\Users\Tape\Documents\MATLAB\SlackMatlab');
+% this repo: https://github.com/mkrumin/data-compression.git
+addpath('C:\Users\Tape\Documents\GitHub\data-compression');
+% get from here: https://github.com/DylanMuir/SlackMatlab.git
+addpath('C:\Users\Tape\Documents\GitHub\SlackMatlab');
+% from here: https://uk.mathworks.com/matlabcentral/fileexchange/25921-getmd5
 addpath('C:\Users\Tape\Documents\MATLAB\GetMD5');
-addpath('C:\Users\Tape\Documents\MATLAB\DataCompression');
+
 %% get Slack webhook for sending notifications
 
-fid = fopen('webhook.txt');
+% text file with a slack incoming webhook, read more here:
+% https://slack.com/apps/A0F7XDUAZ-incoming-webhooks?tab=more_info
+% this works for now, but might get deprecated
+fid = fopen('data-compression-webhook.txt');
 slackWebhook = fgetl(fid);
 fclose(fid);
+
+%% generate hostname, useful when running multiple bots in parallel
+[~, hostName] = system('hostname');
+hostName = hostName(1:end-1);
 
 %% defining main paths
 
 p.remoteRoot = '\\zinu.cortexlab.net\Subjects\';
 % p.remoteRoot2 = '\\128.40.224.65\Subjects\';
-p.archiveRoot = 'B:\RawNPixArchive\';
+% p.archiveRoot = 'B:\RawNPixArchive\';
+% this is the place where raw bin files will be moved after compression
 p.remoteRecycleRoot = '\\zinu.cortexlab.net\Subjects\@Recycle\NPixRaw\';
 p.localRoot = 'F:\ProcessingTmp\';
 p.logRoot = 'C:\NPixCompressionLogs\';
 dbFile = fullfile(p.logRoot, 'compressionZinuDB.xlsx');
+% include full path if not in the system path
+p.compressionCommand = 'mtscomp';
 
-if ~isfolder(p.archiveRoot)
-    mkdir(p.archiveRoot);
-end
+% if ~isfolder(p.archiveRoot)
+%     mkdir(p.archiveRoot);
+% end
 if ~isfolder(p.localRoot)
     mkdir(p.localRoot);
 end
@@ -49,7 +63,7 @@ pattern = '.ap.bin';
 % pattern = 'temp_wh';
 % pattern = 'continuous.dat';
 % pattern = 'proc.dat';
-pattern = 'data.bin';
+% pattern = 'data.bin';
 idx = false(size(fileNames));
 for iFile = 1:numel(fileNames)
     try
@@ -176,11 +190,12 @@ return;
 
 %%
 filesAsStr = sprintf(['The following files will be compressed soon:\n```']);
-for iFile = 1:min(20, numel(files2process))
+for iFile = 1:min(15, numel(files2process))
     filesAsStr = sprintf('%s%s\n', filesAsStr, files2process{iFile});
 end
 filesAsStr = sprintf('%s```', filesAsStr);
-SendSlackNotification(slackWebhook, filesAsStr, [], 'data-compression-bot');
+% SendSlackNotification(slackWebhook, filesAsStr, [], 'data-compression-bot');
+SendSlackNotification(slackWebhook, filesAsStr, [], hostName);
 
 %%
 
@@ -188,10 +203,32 @@ nFilesTotal = numel(files2process);
 
 for iFile = 1:nFilesTotal
     fullFileName = files2process{iFile};
+    if ~isfile(fullFileName)
+        % the file had already been processed by a different bot, probably
+        continue;
+    end
     [folder, file, ~] = fileparts(fullFileName);
     f = dir(fullFileName);
+    % check if the file is being processed by a different bot
+    % if not, label it as In PROGRESS
+    flagFileName = fullfile(f.folder, [f.name, '_INPROGRESS']);
+    if isfile(flagFileName)
+        fID = fopen(flagFileName, 'r');
+        processingHost = fgetl(fID);
+        fclose(fID);
+        if ~isequal(processingHost, hostName)
+            % this file is being processed by a different bot
+            % skip to the next file
+            continue;
+        end
+    else
+        % create a flag file, so that no oher bot will redo the job
+        fID = fopen(flagFileName, 'wt');
+        fprintf(fID, '%s', hostName);
+        fclose(fID);
+    end
     SendSlackNotification(slackWebhook, sprintf('[%s] Starting processing `%s` [%3.1f GB]\n', ...
-        datestr(now), fullFileName, f.bytes/1024^3), [], 'data-compression-bot');
+        datestr(now), fullFileName, f.bytes/1024^3), [], hostName);
     diaryFullFile = fullfile(p.logRoot, sprintf('%s.%s.log', f.name, datestr(now, 'yyyymmdd_hhMMss')));
     diary(diaryFullFile);
     fprintf('[%s] Processing %s\n', datestr(now), fullFileName);
@@ -211,6 +248,8 @@ for iFile = 1:nFilesTotal
         fprintf('Not enough space in one of the locations, exiting now\n')
         SendSlackNotification(slackWebhook, sprintf('[%s] Not enough disk space, quitting\n', datestr(now)), [], 'data-compression-bot');
         diary off;
+        % make sure the file is not blocked from being processed
+        delete(flagFileName);
         break;
     end
 
@@ -228,7 +267,7 @@ for iFile = 1:nFilesTotal
         msg = sprintf('%sStart time: %s\n', msg, datestr(summary.startTime));
         msg = sprintf('%sEnd time: %s\n', msg, datestr(summary.endTime));
         msg = sprintf('%s```\n', msg);
-        SendSlackNotification(slackWebhook, msg, [], 'data-compression-bot');
+        SendSlackNotification(slackWebhook, msg, [], hostName);
 
         % make datenums human readable
         summary.startTime = datestr(summary.startTime);
@@ -244,7 +283,7 @@ for iFile = 1:nFilesTotal
         writetable(tbl, dbFile);
     else
         SendSlackNotification(slackWebhook, sprintf('[%s] Processing `%s` failed, check the logs: `%s`\n', ...
-            datestr(now), fullFileName, diaryFullFile), [], 'data-compression-bot');
+            datestr(now), fullFileName, diaryFullFile), [], hostName);
         fid = fopen(diaryFullFile, 'rt');
         str = fread(fid, '*char')';
         fclose(fid);
@@ -253,17 +292,19 @@ for iFile = 1:nFilesTotal
 %         lines = strsplit(str, char(13));
 %         startIdx = 1:3800:(numel(str)-1);
 %         endIdx = [startIdx(2:end) - 1,  
-        SendSlackNotification(slackWebhook, sprintf('Log:\n```%s```\n', str), [], 'data-compression-bot');
+        SendSlackNotification(slackWebhook, sprintf('Log:\n```%s```\n', str), [], hostName);
         % add this file name to error log
         fid = fopen(fullfile(p.logRoot, 'failedList.txt'), 'at');
         fseek(fid, 0, 'eof');
         fprintf(fid, '[%s] %s\n', datestr(now), fullFileName);
         fclose(fid);
     end
+    % in any case delete the INPROGRESS flag file
+    delete(flagFileName);
 
     % check for STOP flag
     if isfile(fullfile(p.logRoot, 'STOP'))
-        SendSlackNotification(slackWebhook, sprintf('[%s] STOP flag detected, exiting\n', datestr(now)), [], 'data-compression-bot');
+        SendSlackNotification(slackWebhook, sprintf('[%s] STOP flag detected, exiting\n', datestr(now)), [], hostName);
         break;
     end
 end

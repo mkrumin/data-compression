@@ -1,4 +1,4 @@
-function [success, summary, cmdOutput] = processSingleFile(remoteBinFile, paths)
+function [success, summary, cmdOutput] = processSingleFile(remoteBinFile, p)
 
 %% This is a NPix data compresson script
 % Written by Michael Krumin, September 2021
@@ -10,10 +10,11 @@ processingStartTime = now;
 fprintf('[%s] Starting processing\n', datestr(processingStartTime));
 overallStartTime = tic;
 
-remoteRoot = paths.remoteRoot;
-remoteRecycleRoot = paths.remoteRecycleRoot;
-archiveRoot = paths.archiveRoot;
-localRoot = paths.localRoot;
+remoteRoot = p.remoteRoot;
+remoteRecycleRoot = p.remoteRecycleRoot;
+% archiveRoot = p.archiveRoot;
+localRoot = p.localRoot;
+cmpCommand = p.compressionCommand;
 
 if nargin < 1 || ~exist(remoteBinFile, 'file')
     if nargin<1
@@ -37,7 +38,7 @@ if ~isequal(fileExt, '.bin')
     warning('File is not a ''.bin'' file, exiting');
 end
 localFolder = strrep(remoteFolder, remoteRoot, localRoot);
-archiveFolder = strrep(remoteFolder, remoteRoot, archiveRoot);
+% archiveFolder = strrep(remoteFolder, remoteRoot, archiveRoot);
 remoteRecycleFolder = strrep(remoteFolder, remoteRoot, remoteRecycleRoot);
 binFileName = [fileName, fileExt];
 cbinFileName = [fileName, '.cbin'];
@@ -79,7 +80,7 @@ timeCopy2Local = toc(startCopy);
 currentFolder = cd(localFolder);
 
 fileInfo = dir(binFileName);
-commandString = sprintf('mtscomp -d %s -s %d -n %d %s %s %s', dType, sampleRate, ...
+commandString = sprintf('%s -d %s -s %d -n %d %s %s %s', cmpCommand, dType, sampleRate, ...
     nChans, binFileName, cbinFileName, chFileName);
 
 startCompression = tic;
