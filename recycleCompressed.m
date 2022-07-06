@@ -1,11 +1,11 @@
 %% create list of compressed files and check their existence on tape
 
-serverRoot = '\\znas.cortexlab.net\Subjects\';
-serverRecycleRoot = '\\znas.cortexlab.net\Subjects\@Recycle\TempWhDat\';
+serverRoot = '\\zinu.cortexlab.net\Subjects\';
+serverRecycleRoot = '\\zinu.cortexlab.net\Subjects\@Recycle\NPixRaw\';
 % serverRecycleRoot = '\\zinu.cortexlab.net\Subjects\TempWhDat\';
 %%
 forArchiving = sort(alreadyCompressed);
-forArchiving = sort(files2question);
+% forArchiving = sort(files2question);
 nFiles = numel(forArchiving);
 
 %% Move the files to a separate folder before deleting them
@@ -39,6 +39,9 @@ serverRecycleRoot = '\\zinu.cortexlab.net\Subjects\@Recycle\NPixRaw\';
 serverRoot = '\\zinu.cortexlab.net\Subjects\';
 cloneRoot = '\\zinuclone.cortexlab.net\Subjects\';
 
+localTmpFolder = 'D:\ProcessingTmp';
+decompCmd = 'C:\Users\Michael\Anaconda3\Scripts\mtsdecomp';
+
 tic
 fileTreeDelete = getFileTree(serverRecycleRoot);
 toc
@@ -50,6 +53,7 @@ toc
 %%
 nFiles = numel(fileListDelete);
 ok2delete = false(nFiles, 1);
+failed2delete = false(nFiles, 1);
 sameMeta = false(nFiles, 1);
 sizeReasonable = false(nFiles, 1);
 filesOnClone = false(nFiles, 1);
@@ -72,20 +76,31 @@ for iFile = 1:nFiles
                 rmfield(dir(cloneCbinName), 'folder'))
             sameMeta(iFile) = true;
         end
-        if abs((dir(serverCbinName).bytes/dir(fileName).bytes) - 0.5) < 0.2
-            % size is 30-70 % of the original
+        if abs((dir(serverCbinName).bytes/dir(fileName).bytes) - 0.5) < 0.3
+            % size is 20-80 % of the original
             sizeReasonable(iFile) = true;
         end
     end
     if sameMeta(iFile) && sizeReasonable(iFile) && filesOnClone(iFile)
         ok2delete(iFile) = true;
-        fprintf('Deleting %s ..', fileName);
-%         pause;
-        delete(fileName)
-        fprintf('\n');
+%         fprintf('[%d/%d] Deleting %s ..', iFile, nFiles, fileName);
+% %         pause;
+%         delete(fileName);
+%         fprintf('\n');
+        fprintf('[%d/%d] Check&Deleting %s\n', iFile, nFiles, fileName);
+        success = checkAndDelete(fileName, serverCbinName, localTmpFolder, decompCmd);
+        if ~success
+            failed2delete(iFile) = true;
+        end
     else
-        fprintf('Skipping %s\n', fileName);
+        fprintf('[%d/%d] Skipping %s\n', iFile, nFiles, fileName);
     end
 end
+
+total = sum([fileListDelete.bytes])/1024^4;
+deleted = sum([fileListDelete(ok2delete).bytes])/1024^4;
+left = sum([fileListDelete(~ok2delete).bytes])/1024^4;
+fprintf('We had total of %3.1f TB, deleted %3.1f TB, still left %3.1f TB\n', total, deleted, left)
+
 
 
