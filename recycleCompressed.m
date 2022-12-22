@@ -31,16 +31,16 @@ for iFile = 1:nFiles
 end
 
 %% Before deleting confirm that the compressed files are already on the clone
-serverRecycleRoot = '\\znas.cortexlab.net\Subjects\@Recycle\NPixRaw\';
-serverRoot = '\\znas.cortexlab.net\Subjects\';
-cloneRoot = '\\znasclone.cortexlab.net\Subjects\';
+% serverRecycleRoot = '\\znas.cortexlab.net\Subjects\@Recycle\NPixRaw\';
+% serverRoot = '\\znas.cortexlab.net\Subjects\';
+% cloneRoot = '\\znasclone.cortexlab.net\Subjects\';
 
-serverRecycleRoot = '\\zinu.cortexlab.net\Subjects\@Recycle\NPixRaw\';
-serverRoot = '\\zinu.cortexlab.net\Subjects\';
-cloneRoot = '\\zinuclone.cortexlab.net\Subjects\';
+serverRecycleRoot = '\\zaru.cortexlab.net\Subjects\@Recycle\NPixRaw\';
+serverRoot = '\\zaru.cortexlab.net\Subjects\';
+cloneRoot = '\\zaruclone.cortexlab.net\Subjects\';
 
-localTmpFolder = 'D:\ProcessingTmp';
-decompCmd = 'C:\Users\Michael\Anaconda3\Scripts\mtsdecomp';
+localTmpFolder = 'F:\ProcessingTmp';
+decompCmd = 'mtsdecomp';
 
 tic
 fileTreeDelete = getFileTree(serverRecycleRoot);
@@ -88,7 +88,13 @@ for iFile = 1:nFiles
 %         delete(fileName);
 %         fprintf('\n');
         fprintf('[%d/%d] Check&Deleting %s\n', iFile, nFiles, fileName);
+        try
         success = checkAndDelete(fileName, serverCbinName, localTmpFolder, decompCmd);
+        catch e
+            warning('\nFailed to compress the file\n')
+            warning(e.message)
+            success = false;
+        end
         if ~success
             failed2delete(iFile) = true;
         end

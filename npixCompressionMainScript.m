@@ -27,14 +27,14 @@ hostName = hostName(1:end-1);
 
 %% defining main paths
 
-p.remoteRoot = '\\zinu.cortexlab.net\Subjects\';
+p.remoteRoot = '\\zserver.cortexlab.net\Data\Subjects\';
 % p.remoteRoot2 = '\\128.40.224.65\Subjects\';
 % p.archiveRoot = 'B:\RawNPixArchive\';
 % this is the place where raw bin files will be moved after compression
-p.remoteRecycleRoot = '\\zinu.cortexlab.net\Subjects\@Recycle\NPixRaw\';
+p.remoteRecycleRoot = '\\zserver.cortexlab.net\Data\@Recycle\NPixRaw\';
 p.localRoot = 'F:\ProcessingTmp\';
 p.logRoot = 'C:\NPixCompressionLogs\';
-dbFile = fullfile(p.logRoot, 'compressionZinuDB.xlsx');
+dbFile = fullfile(p.logRoot, 'compressionZserverDB.xlsx');
 % include full path if not in the system path
 p.compressionCommand = 'mtscomp';
 
@@ -59,15 +59,18 @@ toc
 %% find all the suspects to be NPix recordings
 fileNames = {serverList.name}';
 % filenames should end with .ap.bin
-pattern = '.ap.bin';
+pattern = '.ap_CAR.bin';
 % pattern = 'temp_wh';
 % pattern = 'continuous.dat';
 % pattern = 'proc.dat';
 % pattern = 'data.bin';
+% pattern = '.npy';
+% pattern = '2022-05-04';
 idx = false(size(fileNames));
 for iFile = 1:numel(fileNames)
     try
         idx(iFile) = isequal(fileNames{iFile}(end-length(pattern)+1:end), pattern);
+%         idx(iFile) = contains(fileNames{iFile}, pattern);
 %         idx(iFile) = isequal(fileNames{iFile}(1:7), pattern);
     catch
     end
@@ -144,7 +147,8 @@ hasCbin = false(nFiles, 1);
 hasCh = false(nFiles, 1);
 for iFile = 1:nFiles
 
-    hasMeta(iFile) = isfile([fileFullNames{iFile}(1:end-4), '.meta']);
+    hasMeta(iFile) = isfile([fileFullNames{iFile}(1:end-8), '.meta']);
+%     hasMeta(iFile) = isfile([fileFullNames{iFile}(1:end-4), '.meta']);
     hasLFP(iFile) = isfile([fileFullNames{iFile}(1:end-7), '.lf.bin']);
     hasLfpMeta(iFile) = isfile([fileFullNames{iFile}(1:end-7), '.lf.meta']);
     hasCbin(iFile) = isfile([fileFullNames{iFile}(1:end-4), '.cbin']);
@@ -165,6 +169,7 @@ candidates = fileFullNames(hasMeta & ~hasCbin);
 
 % exceptionPatterns = {'\AL038\', '\AL039\', '\AL040\','\AL041\'};
 exceptionPatterns = {'fakePatternThatWillNeverOccur'};
+exceptionPatterns = {'30042019_data_npxcourse'};
 exc = false(numel(candidates), 1);
 for iFile = 1:numel(candidates)
     exc(iFile) = contains(candidates(iFile), exceptionPatterns);
@@ -183,7 +188,7 @@ files2question = fileFullNames(~hasMeta);
 
 fprintf('Current free disk space status:\n');
 fprintf('\t%3.1f GB on %s (temporary local processing location)\n', disk_free(p.localRoot)/1024^3, p.localRoot);
-fprintf('\t%3.1f TB on %s (staging for tape archival)\n', disk_free(p.archiveRoot)/1024^4, p.archiveRoot);
+% fprintf('\t%3.1f TB on %s (staging for tape archival)\n', disk_free(p.archiveRoot)/1024^4, p.archiveRoot);
 fprintf('\t%3.1f TB on %s (original raw data location)\n', disk_free(p.remoteRoot)/1024^4, p.remoteRoot);
 
 return;
@@ -201,7 +206,7 @@ SendSlackNotification(slackWebhook, filesAsStr, [], hostName);
 
 nFilesTotal = numel(files2process);
 
-for iFile = 1:nFilesTotal
+for iFile = 5:nFilesTotal
     fullFileName = files2process{iFile};
     if ~isfile(fullFileName)
         % the file had already been processed by a different bot, probably

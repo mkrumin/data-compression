@@ -43,7 +43,7 @@ remoteRecycleFolder = strrep(remoteFolder, remoteRoot, remoteRecycleRoot);
 binFileName = [fileName, fileExt];
 cbinFileName = [fileName, '.cbin'];
 chFileName = [fileName, '.ch'];
-metaFileName = [fileName, '.meta'];
+metaFileName = [strrep(fileName, '.ap_CAR', '.ap'), '.meta'];
 logFileName = [fileName, '.mtscompLog.txt'];
 
 
