@@ -35,6 +35,7 @@ p.remoteRecycleRoot = '\\znas.cortexlab.net\Subjects\@Recycle\NPixRaw';
 p.localRoot = 'Z:\ProcessingTmp\';
 p.logRoot = 'C:\NPixCompressionLogs\';
 dbFile = fullfile(p.logRoot, 'compressionZnasDB_ZULTRA.xlsx');
+
 % include full path if not in the system path
 p.compressionCommand = 'C:\Users\User\Anaconda3\Scripts\mtscomp';
 
@@ -59,7 +60,7 @@ toc
 %% find all the suspects to be NPix recordings
 fileNames = {serverList.name}';
 % filenames should end with .ap.bin
-pattern = '.ap.bin';
+pattern = '.ap_CAR.bin';
 % pattern = 'temp_wh';
 % pattern = 'continuous.dat';
 % pattern = 'proc.dat';
@@ -158,6 +159,7 @@ for iFile = 1:nFiles
 
 %     hasMeta(iFile) = isfile([fileFullNames{iFile}(1:end-8), '.meta']);
     hasMeta(iFile) = isfile([fileFullNames{iFile}(1:end-4), '.meta']);
+
     hasLFP(iFile) = isfile([fileFullNames{iFile}(1:end-7), '.lf.bin']);
     hasLfpMeta(iFile) = isfile([fileFullNames{iFile}(1:end-7), '.lf.meta']);
     [ff, fn, fext] = fileparts(fileFullNames{iFile});
@@ -185,6 +187,7 @@ end
 % exceptionPatterns = {'\AL038\', '\AL039\', '\AL040\','\AL041\'};
 exceptionPatterns = {'fakePatternThatWillNeverOccur'};
 % exceptionPatterns = {'JF'};
+
 exc = false(numel(candidates), 1);
 for iFile = 1:numel(candidates)
     exc(iFile) = contains(candidates(iFile), exceptionPatterns);
@@ -224,7 +227,7 @@ time2stop = datenum('2023-03-31 14:30');
 time2stop = Inf;
 processingSpeed = 88*24*1024^3; % bytes/day
 
-for iFile = 1:nFilesTotal
+for iFile = 5:nFilesTotal
     fullFileName = files2process{iFile};
     if ~isfile(fullFileName)
         % the file had already been processed by a different bot, probably

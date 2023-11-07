@@ -44,6 +44,7 @@ cloneRoot = '\\zclone.cortexlab.net\Subjects\';
 localTmpFolder = 'Z:\ProcessingTmp';
 decompCmd = 'C:\Users\User\Anaconda3\Scripts\mtsdecomp';
 
+
 tic
 fileTreeDelete = getFileTree(serverRecycleRoot);
 toc
@@ -94,6 +95,7 @@ for iFile = 1:nFiles
         fprintf('[%d/%d] Check&Deleting %s\n', iFile, nFiles, fileName);
         try
         success = checkAndDelete(fileName, cloneCbinName, localTmpFolder, decompCmd);
+
         catch e
             warning('\nFailed to compress the file\n')
             warning(e.message)
