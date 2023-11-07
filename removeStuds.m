@@ -2,7 +2,7 @@ function removeStuds(path)
 
 % will recursively remove all the empty subfolders of path 
 if nargin < 1
-    path = 'D:\ProcessingTmp';
+    path = 'F:\ProcessingTmp';
 end
 list = dir(path);
 for iList = 1:numel(list)

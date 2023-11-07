@@ -31,16 +31,18 @@ for iFile = 1:nFiles
 end
 
 %% Before deleting confirm that the compressed files are already on the clone
-serverRecycleRoot = '\\znas.cortexlab.net\Subjects\@Recycle\NPixRaw\';
-serverRoot = '\\znas.cortexlab.net\Subjects\';
-cloneRoot = '\\znasclone.cortexlab.net\Subjects\';
+% serverRecycleRoot = '\\znas.cortexlab.net\Subjects\@Recycle\NPixRaw\';
+% serverRoot = '\\znas.cortexlab.net\Subjects\';
+% cloneRoot = '\\znasclone.cortexlab.net\Subjects\';
 
-serverRecycleRoot = '\\zinu.cortexlab.net\Subjects\@Recycle\NPixRaw\';
-serverRoot = '\\zinu.cortexlab.net\Subjects\';
-cloneRoot = '\\zinuclone.cortexlab.net\Subjects\';
+serverRecycleRoot = '\\zubjects.cortexlab.net\Subjects\@Recycle\NPixRaw\';
+% serverRoot = '\\zserver.cortexlab.net\Data\multichanspikes\';
+% cloneRoot = '\\zclone.cortexlab.net\Data\multichanspikes\';
+serverRoot = '\\zubjects.cortexlab.net\Subjects\';
+cloneRoot = '\\zclone.cortexlab.net\Subjects\';
 
-localTmpFolder = 'D:\ProcessingTmp';
-decompCmd = 'C:\Users\Michael\Anaconda3\Scripts\mtsdecomp';
+localTmpFolder = 'Z:\ProcessingTmp';
+decompCmd = 'C:\Users\User\Anaconda3\Scripts\mtsdecomp';
 
 tic
 fileTreeDelete = getFileTree(serverRecycleRoot);
@@ -76,7 +78,9 @@ for iFile = 1:nFiles
                 rmfield(dir(cloneCbinName), 'folder'))
             sameMeta(iFile) = true;
         end
-        if abs((dir(serverCbinName).bytes/dir(fileName).bytes) - 0.5) < 0.3
+        serverCbinInfo = dir(serverCbinName);
+        fileNameInfo = dir(fileName);
+        if abs((serverCbinInfo.bytes/fileNameInfo.bytes) - 0.5) < 0.49
             % size is 20-80 % of the original
             sizeReasonable(iFile) = true;
         end
@@ -88,7 +92,13 @@ for iFile = 1:nFiles
 %         delete(fileName);
 %         fprintf('\n');
         fprintf('[%d/%d] Check&Deleting %s\n', iFile, nFiles, fileName);
-        success = checkAndDelete(fileName, serverCbinName, localTmpFolder, decompCmd);
+        try
+        success = checkAndDelete(fileName, cloneCbinName, localTmpFolder, decompCmd);
+        catch e
+            warning('\nFailed to compress the file\n')
+            warning(e.message)
+            success = false;
+        end
         if ~success
             failed2delete(iFile) = true;
         end
