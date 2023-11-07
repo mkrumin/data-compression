@@ -35,9 +35,13 @@ serverRecycleRoot = '\\znas.cortexlab.net\Subjects\@Recycle\NPixRaw\';
 serverRoot = '\\znas.cortexlab.net\Subjects\';
 cloneRoot = '\\znasclone.cortexlab.net\Subjects\';
 
-serverRecycleRoot = '\\zinu.cortexlab.net\Subjects\@Recycle\NPixRaw\';
-serverRoot = '\\zinu.cortexlab.net\Subjects\';
-cloneRoot = '\\zinuclone.cortexlab.net\Subjects\';
+serverRecycleRoot = '\\zubjects.cortexlab.net\Subjects\@Recycle\NPixRaw\';
+serverRoot = '\\zubjects.cortexlab.net\Subjects\';
+cloneRoot = '\\zclone.cortexlab.net\Subjects\';
+
+serverRecycleRoot = '\\zserver.cortexlab.net\Data\@Recycle\NPixRaw\';
+serverRoot = '\\zserver.cortexlab.net\Data\Subjects\';
+cloneRoot = '\\zclone.cortexlab.net\Data\Subjects\';
 
 localTmpFolder = 'D:\ProcessingTmp';
 decompCmd = 'C:\Users\Michael\Anaconda3\Scripts\mtsdecomp';
@@ -60,6 +64,7 @@ filesOnClone = false(nFiles, 1);
 for iFile = 1:nFiles
     fileName = fullfile(fileListDelete(iFile).folder, fileListDelete(iFile).name);
     fileCbinName = [fileName(1:end-3), 'cbin'];
+%     fileCbinName = [fileName(1:end-3), 'cdat'];
     fileChName = [fileName(1:end-3), 'ch'];
     serverCbinName = strrep(fileCbinName, serverRecycleRoot, serverRoot);
     serverChName = strrep(fileChName, serverRecycleRoot, serverRoot);
@@ -76,7 +81,7 @@ for iFile = 1:nFiles
                 rmfield(dir(cloneCbinName), 'folder'))
             sameMeta(iFile) = true;
         end
-        if abs((dir(serverCbinName).bytes/dir(fileName).bytes) - 0.5) < 0.3
+        if abs((dir(serverCbinName).bytes/dir(fileName).bytes) - 0.5) < 0.4
             % size is 20-80 % of the original
             sizeReasonable(iFile) = true;
         end
@@ -88,7 +93,8 @@ for iFile = 1:nFiles
 %         delete(fileName);
 %         fprintf('\n');
         fprintf('[%d/%d] Check&Deleting %s\n', iFile, nFiles, fileName);
-        success = checkAndDelete(fileName, serverCbinName, localTmpFolder, decompCmd);
+%         success = checkAndDelete(fileName, serverCbinName, localTmpFolder, decompCmd);
+        success = checkAndDelete(fileName, cloneCbinName, localTmpFolder, decompCmd);
         if ~success
             failed2delete(iFile) = true;
         end

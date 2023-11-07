@@ -6,11 +6,11 @@
 % pipeline (after inspecting the automatically generated lists)
 
 % this repo: https://github.com/mkrumin/data-compression.git
-addpath('C:\Users\Tape\Documents\GitHub\data-compression');
+addpath('C:\Users\Michael\Documents\GitHub\data-compression');
 % get from here: https://github.com/DylanMuir/SlackMatlab.git
-addpath('C:\Users\Tape\Documents\GitHub\SlackMatlab');
+addpath('C:\Users\Michael\Documents\GitHub\SlackMatlab');
 % from here: https://uk.mathworks.com/matlabcentral/fileexchange/25921-getmd5
-addpath('C:\Users\Tape\Documents\MATLAB\GetMD5');
+addpath('C:\Users\Michael\Documents\MATLAB\GetMD5');
 
 %% get Slack webhook for sending notifications
 
@@ -27,16 +27,16 @@ hostName = hostName(1:end-1);
 
 %% defining main paths
 
-p.remoteRoot = '\\zinu.cortexlab.net\Subjects\';
+p.remoteRoot = '\\zinu.cortexlab.net\Subjects\@Recycle';
 % p.remoteRoot2 = '\\128.40.224.65\Subjects\';
 % p.archiveRoot = 'B:\RawNPixArchive\';
 % this is the place where raw bin files will be moved after compression
 p.remoteRecycleRoot = '\\zinu.cortexlab.net\Subjects\@Recycle\NPixRaw\';
-p.localRoot = 'F:\ProcessingTmp\';
+p.localRoot = 'D:\ProcessingTmp\';
 p.logRoot = 'C:\NPixCompressionLogs\';
-dbFile = fullfile(p.logRoot, 'compressionZinuDB.xlsx');
+dbFile = fullfile(p.logRoot, 'compressionZinuDB_zero.xlsx');
 % include full path if not in the system path
-p.compressionCommand = 'mtscomp';
+p.compressionCommand = 'C:\Users\Michael\Anaconda3\Scripts\mtscomp';
 
 % if ~isfolder(p.archiveRoot)
 %     mkdir(p.archiveRoot);
@@ -59,20 +59,27 @@ toc
 %% find all the suspects to be NPix recordings
 fileNames = {serverList.name}';
 % filenames should end with .ap.bin
-pattern = '.ap.bin';
-% pattern = 'temp_wh';
+% pattern = '.ap.bin';
+% pattern = 'temp_wh.dat';
 % pattern = 'continuous.dat';
-% pattern = 'proc.dat';
+pattern = 'proc.dat';
 % pattern = 'data.bin';
+% pattern = 'data_chan2.bin';
+% pattern = {'tcat', '.cbin'};
+% pattern = '.tif';
+pattern = 'EB014'
 idx = false(size(fileNames));
 for iFile = 1:numel(fileNames)
     try
-        idx(iFile) = isequal(fileNames{iFile}(end-length(pattern)+1:end), pattern);
+%         idx(iFile) = isequal(fileNames{iFile}(end-length(pattern)+1:end), pattern);
+        idx(iFile) = contains(fileNames{iFile}, pattern);
+%         idx(iFile) = contains(fileNames{iFile}, pattern{1}) && contains(fileNames{iFile}, pattern{2});
 %         idx(iFile) = isequal(fileNames{iFile}(1:7), pattern);
     catch
     end
 end
 fileList = serverList(idx);
+sum([fileList.bytes])/1024^4
 
 %% do the same for the second server as well
 if isfield(p, 'remoteRoot2')
@@ -183,7 +190,7 @@ files2question = fileFullNames(~hasMeta);
 
 fprintf('Current free disk space status:\n');
 fprintf('\t%3.1f GB on %s (temporary local processing location)\n', disk_free(p.localRoot)/1024^3, p.localRoot);
-fprintf('\t%3.1f TB on %s (staging for tape archival)\n', disk_free(p.archiveRoot)/1024^4, p.archiveRoot);
+% fprintf('\t%3.1f TB on %s (staging for tape archival)\n', disk_free(p.archiveRoot)/1024^4, p.archiveRoot);
 fprintf('\t%3.1f TB on %s (original raw data location)\n', disk_free(p.remoteRoot)/1024^4, p.remoteRoot);
 
 return;
@@ -201,7 +208,7 @@ SendSlackNotification(slackWebhook, filesAsStr, [], hostName);
 
 nFilesTotal = numel(files2process);
 
-for iFile = 1:nFilesTotal
+for iFile = 8:nFilesTotal
     fullFileName = files2process{iFile};
     if ~isfile(fullFileName)
         % the file had already been processed by a different bot, probably

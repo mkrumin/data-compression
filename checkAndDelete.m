@@ -15,9 +15,11 @@ copyfile(serverChName, localTmpFolder)
 fprintf('.done [%g seconds]\n', toc)
 
 currentFolder = cd(localTmpFolder);
-[~, cBinName, ~] = fileparts(serverCbinName);
-cBinName = [cBinName, '.cbin'];
-cmd = sprintf('%s %s --overwrite -nc', decompCmd, cBinName);
+[~, cBinName, cBinExtension] = fileparts(serverCbinName);
+cBinName = [cBinName, cBinExtension];
+[~, fName, fExt] = fileparts(binFileName);
+localBinName = fullfile(fileparts(cBinName), [fName, fExt]);
+cmd = sprintf('%s %s -o %s --overwrite -nc', decompCmd, cBinName, localBinName);
 
 fprintf('\t[%s] Decompressing .cbin locally..', datestr(now, 'HH:MM:SS'))
 tic
@@ -29,7 +31,6 @@ if status
 end
 
 fprintf('\t[%s] Calculating MD5 hash for local .bin..', datestr(now, 'HH:MM:SS'))
-localBinName = [cBinName(1:end-4), 'bin'];
 tic
 md5_local = GetMD5(localBinName, 'File');
 fprintf('.done [%g seconds]\n', toc)
@@ -48,7 +49,8 @@ if isequal(md5_local, md5_remote)
     fprintf('\tDeleting all the local temporary files..');
     delete(localBinName);
     delete(cBinName);
-    delete([cBinName(1:end-4), 'ch']);
+    [~, fName,~] = fileparts(cBinName);
+    delete([fName, '.ch']);
     fprintf('.done\n');
 end
 

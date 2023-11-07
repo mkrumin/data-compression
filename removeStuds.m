@@ -7,11 +7,14 @@ end
 list = dir(path);
 for iList = 1:numel(list)
     if list(iList).isdir 
-        if isequal(list(iList).name, '.') || isequal(list(iList).name, '..')
+        if isequal(list(iList).name, '.') || isequal(list(iList).name, '..') ||...
+                isequal(list(iList).name, '@Recycle') || isequal(list(iList).name, '@Recently-Snapshot')
             continue;
         end
+        fprintf('%s ..', list(iList).name);
         rmdirRec(fullfile(list(iList).folder, list(iList).name)); 
         success = rmdir(fullfile(list(iList).folder, list(iList).name));
+        fprintf('. done\n');
     end
 end
 
