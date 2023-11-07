@@ -1,4 +1,4 @@
-function [success, summary, cmdOutput] = processSingleFile(remoteBinFile, p)
+function [success, summary, cmdOutput] = processSingleFile(remoteBinFile, p, options)
 
 %% This is a NPix data compresson script
 % Written by Michael Krumin, September 2021
@@ -34,16 +34,17 @@ if ~contains(remoteBinFile, remoteRoot)
 end
 
 [remoteFolder, fileName, fileExt] = fileparts(remoteBinFile);
-if ~isequal(fileExt, '.bin')
+if ~isequal(fileExt, '.bin') && nargin<3 % i.e. no options provided
     warning('File is not a ''.bin'' file, exiting');
 end
 localFolder = strrep(remoteFolder, remoteRoot, localRoot);
 % archiveFolder = strrep(remoteFolder, remoteRoot, archiveRoot);
 remoteRecycleFolder = strrep(remoteFolder, remoteRoot, remoteRecycleRoot);
 binFileName = [fileName, fileExt];
-cbinFileName = [fileName, '.cbin'];
+cbinFileName = [fileName, strrep(fileExt, '.', '.c')];
 chFileName = [fileName, '.ch'];
-metaFileName = [strrep(fileName, '.ap_CAR', '.ap'), '.meta'];
+metaFileName = [fileName, '.meta'];
+syncFileName = [fileName, '_sync.dat'];
 logFileName = [fileName, '.mtscompLog.txt'];
 
 
@@ -51,8 +52,10 @@ logFileName = [fileName, '.mtscompLog.txt'];
 
 startCopy = tic;
 fprintf('[%s] Copying remote raw data files to a local temporary location...\n', datestr(now));
-% first copy and parse metadata
-copyVerbose(fullfile(remoteFolder, metaFileName), fullfile(localFolder, metaFileName));
+if nargin<3 % i.e. no options structure was provided
+    % first copy and parse metadata
+    copyVerbose(fullfile(remoteFolder, metaFileName), fullfile(localFolder, metaFileName));
+end
 
 %% figure out paths, filenames, parameters etc.
 
@@ -60,14 +63,20 @@ copyVerbose(fullfile(remoteFolder, metaFileName), fullfile(localFolder, metaFile
 % an integer (realistically single digit, in theory can be more)
 % LFP data has similar filname format: '*.imec?.lf.bin'
 
-try
-    [sampleRate, nChans, dType] = parseMetaFile(fullfile(localFolder, metaFileName));
-catch ME
-    fprintf('parseMetaFile failed with the following message\n%s\n', ME.message)
+if nargin<3
     try
-        disp(ME.stack(1));
+        [sampleRate, nChans, dType] = parseMetaFile(fullfile(localFolder, metaFileName));
+    catch ME
+        fprintf('parseMetaFile failed with the following message\n%s\n', ME.message)
+        try
+            disp(ME.stack(1));
+        end
+        return;
     end
-    return;
+else
+    sampleRate = options.sampleRate;
+    nChans = options.nChans;
+    dType = options.dType;
 end
 
 % if meta file is valid copy the neural data
@@ -80,6 +89,19 @@ timeCopy2Local = toc(startCopy);
 currentFolder = cd(localFolder);
 
 fileInfo = dir(binFileName);
+
+fprintf('[%s] Extracting the sync channel from %s...\n', datestr(now), binFileName);
+tmp = ones(1, 1, dType);
+tmp = whos('tmp');
+nSamples = fileInfo.bytes/nChans/tmp.bytes;
+mmf = memmapfile(binFileName, 'Format', {dType, [nChans, nSamples], 'x'});
+syncData = mmf.Data.x(end, :);
+fID = fopen(syncFileName, 'w');
+fwrite(fID, syncData, dType);
+fclose(fID);
+clear mmf;
+
+
 commandString = sprintf('%s -d %s -s %d -n %d %s %s %s', cmpCommand, dType, sampleRate, ...
     nChans, binFileName, cbinFileName, chFileName);
 
@@ -118,6 +140,7 @@ startCopy = tic;
 fprintf('[%s] Copying compressed files to the server...\n', datestr(now));
 copyVerbose(fullfile(localFolder, cbinFileName), fullfile(remoteFolder, cbinFileName));
 copyVerbose(fullfile(localFolder, chFileName), fullfile(remoteFolder, chFileName));
+copyVerbose(fullfile(localFolder, syncFileName), fullfile(remoteFolder, syncFileName));
 copyVerbose(fullfile(localFolder, logFileName), fullfile(remoteFolder, logFileName));
 timeCopy2Server = toc(startCopy);
 
@@ -139,6 +162,15 @@ remoteMD5 = GetMD5(fullfile(remoteFolder, cbinFileName), 'File');
 if ~isequal(localMD5, remoteMD5)
     warning('Compressed files did not copy properly to the server')
     warning('Check %s ', fullfile(remoteFolder, cbinFileName));
+    warning('Aborting now');
+    return;
+end
+
+localMD5 = GetMD5(fullfile(localFolder, syncFileName), 'File');
+remoteMD5 = GetMD5(fullfile(remoteFolder, syncFileName), 'File');
+if ~isequal(localMD5, remoteMD5)
+    warning('Compressed files did not copy properly to the server')
+    warning('Check %s ', fullfile(remoteFolder, syncFileName));
     warning('Aborting now');
     return;
 end
@@ -167,6 +199,7 @@ fprintf('%s\n', binFileName); delete(fullfile(localFolder, binFileName));
 fprintf('%s\n', metaFileName); delete(fullfile(localFolder, metaFileName));
 fprintf('%s\n', cbinFileName); delete(fullfile(localFolder, cbinFileName));
 fprintf('%s\n', chFileName); delete(fullfile(localFolder, chFileName));
+fprintf('%s\n', syncFileName); delete(fullfile(localFolder, syncFileName));
 fprintf('%s\n', logFileName); delete(fullfile(localFolder, logFileName));
 [status,msg,msgID] = rmdir(localFolder);
 if ~status
@@ -275,6 +308,7 @@ fSize = str2double(meta.fileSizeBytes);
 
 bitsPerSample = 8 * fSize/(sampleRate * nChans * dur);
 tol = 1e-9;
+tol = 4
 if abs(bitsPerSample - 16) < tol
     dType = 'int16';
 else

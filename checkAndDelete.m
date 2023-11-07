@@ -4,12 +4,14 @@ success = false;
 
 serverChName = [serverCbinName(1:end-4), 'ch'];
 
-fprintf('\t[%s] Copying .cbin locally (%3.1f GB)..', datestr(now, 'HH:MM:SS'), dir(serverCbinName).bytes/1024^3)
+serverCbinNameInfo = dir(serverCbinName);
+fprintf('\t[%s] Copying .cbin locally (%3.1f GB)..', datestr(now, 'HH:MM:SS'), serverCbinNameInfo.bytes/1024^3)
 tic
 copyfile(serverCbinName, localTmpFolder)
 fprintf('.done [%g seconds]\n', toc)
 
-fprintf('\t[%s] Copying .ch locally (%3.1f KB)..', datestr(now, 'HH:MM:SS'), dir(serverChName).bytes/1024)
+serverChNameInfo = dir(serverChName);
+fprintf('\t[%s] Copying .ch locally (%3.1f KB)..', datestr(now, 'HH:MM:SS'), serverChNameInfo.bytes/1024)
 tic
 copyfile(serverChName, localTmpFolder)
 fprintf('.done [%g seconds]\n', toc)

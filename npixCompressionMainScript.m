@@ -6,11 +6,11 @@
 % pipeline (after inspecting the automatically generated lists)
 
 % this repo: https://github.com/mkrumin/data-compression.git
-addpath('C:\Users\Tape\Documents\GitHub\data-compression');
+addpath('C:\Users\User\Documents\GitHub\data-compression');
 % get from here: https://github.com/DylanMuir/SlackMatlab.git
-addpath('C:\Users\Tape\Documents\GitHub\SlackMatlab');
+addpath('C:\Users\User\Documents\GitHub\SlackMatlab');
 % from here: https://uk.mathworks.com/matlabcentral/fileexchange/25921-getmd5
-addpath('C:\Users\Tape\Documents\MATLAB\GetMD5');
+addpath('C:\Users\User\Documents\MATLAB\GetMD5');
 
 %% get Slack webhook for sending notifications
 
@@ -27,16 +27,17 @@ hostName = hostName(1:end-1);
 
 %% defining main paths
 
-p.remoteRoot = '\\zserver.cortexlab.net\Data\Subjects\';
+p.remoteRoot = '\\znas.cortexlab.net\Subjects\';
 % p.remoteRoot2 = '\\128.40.224.65\Subjects\';
 % p.archiveRoot = 'B:\RawNPixArchive\';
 % this is the place where raw bin files will be moved after compression
-p.remoteRecycleRoot = '\\zserver.cortexlab.net\Data\@Recycle\NPixRaw\';
-p.localRoot = 'F:\ProcessingTmp\';
+p.remoteRecycleRoot = '\\znas.cortexlab.net\Subjects\@Recycle\NPixRaw';
+p.localRoot = 'Z:\ProcessingTmp\';
 p.logRoot = 'C:\NPixCompressionLogs\';
-dbFile = fullfile(p.logRoot, 'compressionZserverDB.xlsx');
+dbFile = fullfile(p.logRoot, 'compressionZnasDB_ZULTRA.xlsx');
+
 % include full path if not in the system path
-p.compressionCommand = 'mtscomp';
+p.compressionCommand = 'C:\Users\User\Anaconda3\Scripts\mtscomp';
 
 % if ~isfolder(p.archiveRoot)
 %     mkdir(p.archiveRoot);
@@ -83,7 +84,7 @@ if isfield(p, 'remoteRoot2')
     serverList2 = getFlatFileList(serverTree2);
     fileNames2 = {serverList2.name}';
     % filenames should end with .ap.bin
-    pattern = '.ap.bin';
+%     pattern = '.ap.bin';
     idx = false(size(fileNames2));
     for iFile = 1:numel(fileNames2)
         try
@@ -108,16 +109,25 @@ fprintf('.done (%g seconds)\n', toc(tStart))
 %% full list of all potential duplicates
 % these will be excluded from the compression pipeline for the timebeing
 
-dupsFullList = [{duplicates.fileA}'; {duplicates.fileB}'];
-if isfield(p, 'remoteRoot2')
-dupsFullList = [dupsFullList; ...
-    {duplicates2.fileA}'; {duplicates2.fileB}'; ...
-    {duplicates12.fileA}'; {duplicates12.fileB}'];
+if isempty(fields(duplicates))
+    dupsFullList = cell(0);
+else
+    dupsFullList = [{duplicates.fileA}'; {duplicates.fileB}'];
+    if isfield(p, 'remoteRoot2')
+        dupsFullList = [dupsFullList; ...
+            {duplicates2.fileA}'; {duplicates2.fileB}'; ...
+            {duplicates12.fileA}'; {duplicates12.fileB}'];
+    end
 end
 dupsFullList = unique(dupsFullList);
 
 %% create a report on duplicates
-tt = dupTable(duplicates, p.remoteRoot);
+
+if ~isempty(fields(duplicates))
+    tt = dupTable(duplicates, p.remoteRoot);
+else
+    tt = table;
+end
 if isfield(p, 'remoteRoot2')
     tt2 = dupTable(duplicates2, p.remoteRoot2);
     tt12 = dupTable(duplicates12, '');
@@ -147,12 +157,16 @@ hasCbin = false(nFiles, 1);
 hasCh = false(nFiles, 1);
 for iFile = 1:nFiles
 
-    hasMeta(iFile) = isfile([fileFullNames{iFile}(1:end-8), '.meta']);
-%     hasMeta(iFile) = isfile([fileFullNames{iFile}(1:end-4), '.meta']);
+%     hasMeta(iFile) = isfile([fileFullNames{iFile}(1:end-8), '.meta']);
+    hasMeta(iFile) = isfile([fileFullNames{iFile}(1:end-4), '.meta']);
+
     hasLFP(iFile) = isfile([fileFullNames{iFile}(1:end-7), '.lf.bin']);
     hasLfpMeta(iFile) = isfile([fileFullNames{iFile}(1:end-7), '.lf.meta']);
-    hasCbin(iFile) = isfile([fileFullNames{iFile}(1:end-4), '.cbin']);
-    hasCh(iFile) = isfile([fileFullNames{iFile}(1:end-4), '.ch']);
+    [ff, fn, fext] = fileparts(fileFullNames{iFile});
+    compressedFilename = fullfile(ff, [fn, strrep(fext, '.', '.c')]);
+    hasCbin(iFile) = isfile(compressedFilename);
+    chFilename = fullfile(ff, [fn, '.ch']);
+    hasCh(iFile) = isfile(chFilename);
 
 end
 
@@ -163,13 +177,17 @@ end
 % only compress files that have meta information and also were not already
 % compressed (i.e. there is no .cbin and .ch file nearby)
 
-
-
-candidates = fileFullNames(hasMeta & ~hasCbin);
-
+if isequal(pattern(end-3:end), '.bin')
+    % only require meta file for .bin files
+    candidates = fileFullNames(hasMeta & ~hasCbin);
+else
+    % e.g. for .dat files only check if they were not already compressed
+    candidates = fileFullNames(~hasCbin);
+end
 % exceptionPatterns = {'\AL038\', '\AL039\', '\AL040\','\AL041\'};
 exceptionPatterns = {'fakePatternThatWillNeverOccur'};
-exceptionPatterns = {'30042019_data_npxcourse'};
+% exceptionPatterns = {'JF'};
+
 exc = false(numel(candidates), 1);
 for iFile = 1:numel(candidates)
     exc(iFile) = contains(candidates(iFile), exceptionPatterns);
@@ -205,6 +223,9 @@ SendSlackNotification(slackWebhook, filesAsStr, [], hostName);
 %%
 
 nFilesTotal = numel(files2process);
+time2stop = datenum('2023-03-31 14:30');
+time2stop = Inf;
+processingSpeed = 88*24*1024^3; % bytes/day
 
 for iFile = 5:nFilesTotal
     fullFileName = files2process{iFile};
@@ -212,8 +233,14 @@ for iFile = 5:nFilesTotal
         % the file had already been processed by a different bot, probably
         continue;
     end
-    [folder, file, ~] = fileparts(fullFileName);
+    [folder, file, fext] = fileparts(fullFileName);
     f = dir(fullFileName);
+    if f.bytes/(time2stop - now) > processingSpeed
+        % Unlikely to have have time to finish this job in time
+        SendSlackNotification(slackWebhook, sprintf('[%s] Not enough time to process next file (%3.1f GB) until the %s deadline, exiting\n', ...
+            datestr(now), f.bytes/1024^3, datestr(time2stop, 'YYYY-mm-DD HH:MM')), [], hostName);
+        return;
+    end
     % check if the file is being processed by a different bot
     % if not, label it as In PROGRESS
     flagFileName = fullfile(f.folder, [f.name, '_INPROGRESS']);
@@ -250,15 +277,33 @@ for iFile = 5:nFilesTotal
         p.remoteRoot, char(' OK'*remoteOK + 'BAD'*~remoteOK));
 %     if ~(locOK && archOK && remoteOK)
     if ~(locOK && remoteOK)
-        fprintf('Not enough space in one of the locations, exiting now\n')
-        SendSlackNotification(slackWebhook, sprintf('[%s] Not enough disk space, quitting\n', datestr(now)), [], 'data-compression-bot');
+        fprintf('Not enough space in one of the locations, skipping this file\n')
+        SendSlackNotification(slackWebhook, sprintf('[%s] Not enough disk space, skipping the file\n', datestr(now)), [], 'data-compression-bot');
         diary off;
         % make sure the file is not blocked from being processed
         delete(flagFileName);
-        break;
+        continue;
     end
-
-    [success, summary, mtscompOutput] = processSingleFile(fullFileName, p);
+    
+    if isequal([file, fext], 'continuous.dat')
+        options.dType = 'int16';
+        options.nChans = 384;
+        if endsWith(folder, 'Neuropix-3a-100.1')
+            options.sampleRate = 2500;
+        elseif endsWith(folder, 'Neuropix-3a-100.0')
+            options.sampleRate = 30000;
+        else
+            % this will crash the code later on and the file will be
+            % skipped
+            options.sampleRate = NaN;
+        end
+        [success, summary, mtscompOutput] = processSingleFile(fullFileName, p, options);
+        options.dType = '';
+        options.nChans = NaN;
+        options.sampleRate = NaN;
+    else
+        [success, summary, mtscompOutput] = processSingleFile(fullFileName, p);
+    end
 
     diary off
 
